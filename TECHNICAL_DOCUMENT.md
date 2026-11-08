@@ -1,83 +1,164 @@
-# Phase 1: Enhanced UNIX Shell — Technical Document
+# Phase 1: Enhanced UNIX Shell
 
-**Course:** COSC 414 Operating Systems  
 **Student:** Joshua Brown  
-**Team members:** [List every actual team member]  
-**Submission date:** November 8, 2026
+**Course:** COSC 414 — Operating Systems  
+**Date:** November 8, 2026  
+**Repository:** https://github.com/joshuabriwnjb-hue/COSC414-Enhanced-Smallsh
 
-## Team responsibilities
+## 1. Project Goal
 
-| Member | Assigned tasks | Work actually completed |
-| --- | --- | --- |
-| Joshua Brown | [Confirm responsibilities] | [Describe actual contribution] |
-| [Member name, or remove row] | [Assigned tasks] | [Completed work] |
+The goal of Phase 1 was to develop an enhanced Unix shell based on the smallsh command-processing structure presented in Chapter 5. The shell supports foreground and background execution, signal handling, process groups, job tracking, and the built-in commands jobs, bg, fg, and kill.
 
-Complete this table from the team's actual division of work. Do not claim contributions that have not occurred.
+Chapter 5 was used as a reference for the implementation. Its exercise questions were not part of this submission.
 
-## Development environment
+## 2. Individual Responsibilities
 
-The intended local testing environment is the Linux terminal on a Chromebook. The assignment specifies Ubuntu in VirtualBox; the environment below must accurately state whether an instructor-approved alternative or the specified VM was used.
+This project was completed individually by Joshua Brown. The individual responsibilities covered preparing the development environment, managing the source files, compiling the program, conducting terminal tests, recording results, documenting the implementation, and uploading the project to GitHub.
 
-- Chromebook model: [Enter model]
-- Linux distribution/version from /etc/os-release: [Enter actual output]
-- Kernel/architecture from uname -a: [Enter actual output]
-- GCC version: [Enter actual output]
-- Available processors and memory: [Enter actual values]
-- VirtualBox version, Ubuntu guest version and assigned VM resources: [Enter actual details if used; otherwise state not used]
-- Instructor authorization for an alternate environment: [Record actual authorization, if applicable]
+No team communication platform was used because there were no additional team members. GitHub was used to store and share the project source.
 
-## Collaboration
+## 3. Development Environment
 
-Actual collaboration platform(s): [GitHub / Teams / Zoom / GroupMe / other actually used].
-Repository or shared-work link: [Enter link if available].
-Describe how the team shared source files, coordinated tasks, and reviewed tests: [Complete from actual activity]. Do not claim VM sharing or repository use unless performed.
+The program was compiled and tested using the Linux terminal on a Chromebook.
 
-## Design and implementation
+| Component | Observed configuration |
+| --- | --- |
+| Linux distribution | Debian GNU/Linux 12 (bookworm) |
+| Hostname | penguin |
+| Kernel | 6.6.147-09648-g97ef00d8a343 |
+| Architecture | x86_64 |
+| Compiler | GCC 12.2.0, Debian package 12.2.0-14+deb12u1 |
+| Available logical processors | 2 |
+| Total memory reported by Linux | 2.7 GiB |
+| Swap | 0 B |
 
-The supplied Chapter 5 smallsh discussion establishes the userin, gettok, procline, and runcommand stages. The enhanced program retains these stages, with definitions consolidated into smallsh.c. userin reads a bounded line; gettok identifies arguments and separators; procline assembles argument vectors; runcommand dispatches built-ins or launches external programs with fork and execvp. Semicolons run successive commands, and ampersands launch background jobs. Chapter 5 exercise questions are outside this submission.
+The assignment specifies an Ubuntu VirtualBox environment. The tests documented here were performed in Chromebook Linux running Debian 12, rather than an Ubuntu VirtualBox guest. Acceptance of this environment as an alternative has not been confirmed.
 
-The shell installs a SIGINT handler using sigaction. At the prompt, the handler records interruption and writes a newline using an async-signal-safe operation. Interrupted input is cleared and the prompt is restored. The shell ignores SIGTSTP and terminal-control stop signals after initialization. Children restore default signal dispositions so foreground programs respond normally to Ctrl+C and Ctrl+Z.
+## 4. Implementation
 
-Each external command is placed in a separate process group using setpgid in both parent and child. The parent hands the terminal to a foreground job using tcsetpgrp and waits with waitpid and WUNTRACED. A pipe acts as a launch gate so a newly forked child cannot attempt terminal input before the handoff. On termination or stop, the shell regains the terminal and restores its terminal settings. Stopped jobs retain their own saved terminal settings for later fg use.
+### Command Processing
 
-A fixed job table stores each active job's ID, PGID, command, state and saved terminal settings. jobs displays active entries. bg sends SIGCONT to a process group. fg transfers terminal ownership and resumes the job. kill accepts a job ID or a positive PID; job targets use a negative PGID with kill(2) to signal the whole group. waitpid with WNOHANG, WUNTRACED and WCONTINUED updates background states before prompts and commands. State changes do not occur in signal handlers.
+The implementation retains the Chapter 5 stages: userin, gettok, procline, and runcommand. Definitions are consolidated into smallsh.c.
 
-## Compilation
+The shell reads a command line, separates it into arguments, checks for built-in commands, and launches external programs using fork and execvp. A semicolon separates successive commands, while an ampersand starts a command in the background.
+
+### Signals and Interrupt Handling
+
+The shell uses sigaction to establish signal behavior. Ctrl+C at the shell prompt does not terminate the shell. Child processes restore default signal behavior so foreground programs respond to Ctrl+C and Ctrl+Z.
+
+During testing, Ctrl+C terminated a foreground sleep command, and the shell remained available to execute another command. Ctrl+Z stopped a foreground sleep command and returned control to the shell.
+
+### Process Groups and Terminal Control
+
+Each external command is assigned its own process group using setpgid. For a foreground job, tcsetpgrp transfers terminal control to the job’s process group. The shell waits for the job to terminate or stop, then restores its own terminal control.
+
+A pipe synchronizes initial child execution with terminal handoff. This prevents a foreground child from attempting terminal input before its process group receives the terminal.
+
+### Job Tracking
+
+The job table records each active job’s number, process group ID, command, and running or stopped state. The shell uses waitpid to detect termination, stopping, and continuation.
+
+Completed background jobs are reaped at command and prompt boundaries. Their termination messages may therefore appear when the next command is entered.
+
+### Built-in Commands
+
+| Command | Function |
+| --- | --- |
+| jobs | Displays tracked jobs, their states, and process group IDs |
+| bg %N | Resumes job N in the background |
+| fg %N | Transfers job N to the foreground and resumes it |
+| kill %N | Sends a termination signal to job N’s process group |
+| exit | Exits the shell |
+
+The kill built-in also supports positive PID targets and selected named or numeric signals.
+
+## 5. Compilation
+
+The program was compiled using make, which executed:
 
 ```bash
 gcc -std=c11 -Wall -Wextra -Wpedantic -O2 smallsh.c -o smallsh
+```
+
+Compilation completed without warning or error messages. Running the following command displayed the Command> prompt:
+
+```bash
 ./smallsh
 ```
 
-Actual local compilation result: [Record warnings/errors or successful build; attach screenshot].
+## 6. Testing and Observed Results
 
-## Base testing on the student's environment
-
-| Test | Expected behavior | Actual observation / evidence |
+| Test | Observed result | Status |
 | --- | --- | --- |
-| echo and semicolon-separated commands | Correct ordered output | Pending local test |
-| sleep 300, then Ctrl+C | Child ends; shell survives | Pending local test |
-| Ctrl+C at an empty prompt | Fresh prompt; shell survives | Pending local test |
-| sleep 300, then Ctrl+Z and jobs | Stopped job listed | Pending local test |
-| bg %N, then jobs | Same job runs in background | Pending local test |
-| fg %N, then Ctrl+C | Job owns terminal, then terminates | Pending local test |
-| sleep 300 & and jobs | Immediate prompt, Running job | Pending local test |
-| kill %N, sleep 1, jobs | Job terminated and removed | Pending local test |
-| Process-group inspection using ps | Distinct shell and child PGIDs; correct TPGID | Pending local test |
-| cat &, then fg %N | Background reader stops; foreground reader works | Pending local test |
-| Invalid command/job | Error; shell remains usable | Pending local test |
-| exit / Ctrl+D | Shell exits | Pending local test |
+| Compile and launch | Program compiled and displayed Command> | Passed |
+| Foreground Ctrl+C | sleep 300 terminated; the shell remained running | Passed |
+| Command after interruption | echo printed “Shell survived Ctrl+C” | Passed |
+| Foreground Ctrl+Z | Job 3 stopped and appeared in jobs with PGID 5057 | Passed |
+| Background launch | sleep 600 & returned the prompt immediately | Passed |
+| jobs | Job 6 appeared as Running with PGID 5084 | Passed |
+| fg | fg %6 brought the job to the foreground; Ctrl+Z stopped it | Passed |
+| bg | bg %6 resumed the stopped job in the background | Passed |
+| kill | kill %6 terminated the job; jobs reported termination | Passed |
+| Process-group inspection | Shell and sleep had distinct process group IDs | Passed |
+| Semicolon-separated commands | echo first; echo second printed both lines in order | Passed |
+| Invalid external command | An error appeared and the shell continued running | Passed |
+| Invalid fg target | fg %999 reported “fg: no such job” | Passed |
+| Invalid bg target | bg %999 reported “bg: no such job” | Passed |
+| Invalid kill target | kill %999 reported “kill: no such job” | Passed |
+| Background terminal input | cat & stopped when it attempted terminal input | Passed |
+| Foreground terminal input | fg %7 resumed cat, which read and echoed hello | Passed |
+| End-of-file for cat | Ctrl+D ended cat and returned the shell prompt | Passed |
+| Shell exit | exit returned to the normal Linux terminal prompt | Passed |
 
-Attach actual screenshots marked in START_HERE.md and record IDs observed on your system. Do not substitute sample IDs or development-machine results for your own evidence.
+### Process-Group Evidence
 
-## Preparation-time validation
+The following command inspected the shell and its background sleep process:
 
-The delivered source compiled with GCC using -std=c11 -Wall -Wextra -Wpedantic -O2 without warnings in the preparation environment. A separate pseudo-terminal harness checked prompt Ctrl+C, foreground stop/resume/interrupt, background tracking, STOP/TERM, background terminal reads and fg, semicolon parsing, failed exec, invalid job lookup, and exit. These checks passed. They do not constitute execution on the student's Chromebook or the required Ubuntu VirtualBox VM.
+```text
+Command> ps -o pid,ppid,pgid,tpgid,stat,args -p 5123,5124
+  PID  PPID  PGID TPGID STAT COMMAND
+ 5123  5008  5123  5126 S    ./smallsh
+ 5124  5123  5124  5126 S    sleep 600
+```
 
-## Limitations
+The shell had PID and PGID 5123. Its sleep child had PID and PGID 5124, showing that the child belonged to a separate process group. The child’s PPID of 5123 identified smallsh as its parent.
 
-The shell tracks one direct child per job and has a fixed 128-job limit. It does not implement pipelines, redirection, expansion, comments, escapes, or cd. Background completion notifications and reaping happen at command/prompt boundaries; a child finishing during idle input may remain a zombie until the next command. Program descendants share group signals but are not separately tracked after their direct parent exits. These limits should be explained during demonstration.
+TPGID was 5126 because the foreground ps command temporarily owned the terminal while collecting this output. This observation does not independently show the terminal’s foreground group while the shell was idle.
 
-## Conclusion
+The background sleep job was subsequently terminated using kill %1. The jobs command reported:
 
-[After local testing, summarize the observed foreground/background behavior, signal behavior, process-group evidence, and any unresolved issues.]
+```text
+[1] Terminated sleep 600
+```
+
+### Background Terminal-Input Evidence
+
+The terminal interaction below demonstrated stopping and resuming a program that reads standard input:
+
+```text
+Command> cat &
+[7] 5142
+Command> jobs
+[7] Stopped cat
+[7] Stopped PGID=5142 cat
+Command> fg %7
+hello
+hello
+Command>
+```
+
+The background cat process stopped when it attempted to read from the terminal. After fg moved it to the foreground, it accepted and echoed input. Ctrl+D ended cat and returned control to the shell.
+
+## 7. Limitations
+
+The implementation tracks one direct child per job and supports up to 128 active jobs. It does not implement pipelines, input/output redirection, wildcard expansion, variable expansion, command substitution, comments, escape processing, or a cd built-in.
+
+Background status updates occur at command and prompt boundaries. A background child that finishes while the shell is waiting for input can remain a zombie until the next command causes the shell to reap it.
+
+Signals sent to a job’s process group can reach descendants that remain in that group. However, the shell tracks and waits for its direct child rather than tracking every descendant separately.
+
+## 8. Conclusion
+
+The terminal tests demonstrated the required jobs, bg, fg, and kill commands, foreground and background execution, stopping and resuming jobs, and Ctrl+C handling without terminating the shell. Process inspection confirmed separate process groups for the shell and its child. Additional tests showed successful command sequencing, error handling, and foreground terminal input.
+
+These results establish successful execution in the tested Debian 12 Chromebook Linux environment. Execution in the assignment’s specified Ubuntu VirtualBox environment remains unverified.
